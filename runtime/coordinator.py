@@ -9,9 +9,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from lock_manager import LockManager
-from step_executor import StepExecutor
-from state_manager import StateManager
+from runtime.lock_manager import LockManager
+from runtime.step_executor import StepExecutor
+from runtime.state_manager import StateManager
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
@@ -64,7 +64,7 @@ class Coordinator:
             session.commit()
             
             # Execute two agent steps sequentially
-            steps = ["summarize", "extract_entities"]
+            steps = ["summarize", "extract_entities", "ollama"]
             final_output = {}
             
             for i, step_name in enumerate(steps):

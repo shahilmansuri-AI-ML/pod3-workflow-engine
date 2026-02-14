@@ -3,9 +3,10 @@ from typing import Dict, Any
 
 class ADKAdapter:
     def __init__(self):
-        self.agent_registry = {
+       self.agent_registry = {
             "summarize": "agents.summarize_agent.SummarizeAgent",
-            "extract_entities": "agents.entity_agent.EntityAgent"
+            "extract_entities": "agents.entity_agent.EntityAgent",
+            "ollama": "agents.ollama_agent.OllamaAgent"
         }
     
     def invoke_agent(self, agent_name: str, input_payload: Dict[str, Any], execution_context: Dict[str, Any]) -> Dict[str, Any]:

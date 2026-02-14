@@ -20,6 +20,7 @@ COPY runtime ./runtime
 COPY adapters ./adapters
 COPY agents ./agents
 COPY db ./db
+COPY api ./api
 
 # Set Python path
 ENV PYTHONPATH=/app
