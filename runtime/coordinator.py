@@ -64,7 +64,7 @@ class Coordinator:
             session.commit()
             
             # Execute two agent steps sequentially
-            steps = ["summarize", "extract_entities", "ollama"]
+            steps = ["ollama"] # "summarize", "extract_entities",
             final_output = {}
             
             for i, step_name in enumerate(steps):
