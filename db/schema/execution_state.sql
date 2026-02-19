@@ -1,10 +1,18 @@
+-- Execution State Table (Resumability)
 CREATE TABLE execution_state (
     execution_id UUID PRIMARY KEY
-        REFERENCES executions(execution_id) ON DELETE CASCADE,
+        REFERENCES executions(execution_id)
+        ON DELETE CASCADE,
 
-    state_snapshot JSONB NOT NULL,
-    last_completed_step_key VARCHAR,
-    version INTEGER DEFAULT 1,
+    -- Snapshot of runtime memory/state
+    state_snapshot JSONB NOT NULL DEFAULT '{}',
 
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    -- Last successfully completed step
+    last_completed_step_key VARCHAR(255),
+
+    -- Optimistic locking version
+    version INTEGER NOT NULL DEFAULT 1,
+
+    -- Timestamp
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

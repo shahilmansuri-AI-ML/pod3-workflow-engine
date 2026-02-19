@@ -4,3 +4,5 @@
 \i /db/schema/execution_state.sql
 \i /db/schema/execution_events.sql
 \i /db/schema/execution_locks.sql
+\i /db/schema/agent_registry.sql
+\i /db/schema/triggers.sql

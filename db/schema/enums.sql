@@ -1,11 +1,21 @@
+-- Execution Status
 CREATE TYPE execution_status AS ENUM (
-    'CREATED',
-    'RUNNING',
-    'FAILED',
-    'COMPLETED',
-    'CANCELLED'
+    'PENDING',      -- Waiting to start
+    'RUNNING',      -- Currently executing
+    'COMPLETED',    -- Successfully finished
+    'FAILED',       -- Execution failed
+    'CANCELLED'     -- Manually stopped
 );
 
+-- Step Status
+CREATE TYPE step_status AS ENUM (
+    'PENDING',
+    'RUNNING',
+    'COMPLETED',
+    'FAILED'
+);
+
+-- Trigger Type
 CREATE TYPE trigger_type AS ENUM (
     'manual',
     'cron',
@@ -13,13 +23,7 @@ CREATE TYPE trigger_type AS ENUM (
     'agent_call'
 );
 
-CREATE TYPE step_status AS ENUM (
-    'PENDING',
-    'RUNNING',
-    'FAILED',
-    'COMPLETED'
-);
-
+-- Step Type
 CREATE TYPE step_type AS ENUM (
     'llm',
     'tool',
@@ -27,20 +31,44 @@ CREATE TYPE step_type AS ENUM (
     'condition'
 );
 
+-- Event Type
 CREATE TYPE event_type AS ENUM (
     'EXECUTION_STARTED',
+    'EXECUTION_COMPLETED',
+    'EXECUTION_FAILED',
+    'STEP_STARTED',
+    'STEP_COMPLETED',
     'STEP_FAILED',
-    'RETRY_SCHEDULED',
-    'EXECUTION_COMPLETED'
+    'AGENT_INVOKED',
+    'AGENT_RESPONSE',
+    'RETRY_SCHEDULED'
 );
 
+-- Event Source
 CREATE TYPE event_source AS ENUM (
     'executor',
     'orchestrator',
     'agent'
 );
 
+-- Lock Type
 CREATE TYPE lock_type AS ENUM (
     'execution',
     'step'
 );
+
+-- Agent Status Enum
+CREATE TYPE agent_status AS ENUM (
+    'DRAFT',
+    'ACTIVE',
+    'PAUSED',
+    'ARCHIVED'
+);
+
+-- Agent Type Enum
+CREATE TYPE agent_type AS ENUM (
+    'low_code',
+    'high_code',
+    'no_code'
+);
+

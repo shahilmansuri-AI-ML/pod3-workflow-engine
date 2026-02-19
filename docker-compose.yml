@@ -1,17 +1,42 @@
 version: "3.9"
 
 services:
+
   db:
+
     build:
       context: .
       dockerfile: docker/postgres/Dockerfile
-    container_name: pod3_postgres
+    container_name: pod3_db
     env_file:
       - .env
     ports:
-      - "5434:5432"
+      - "5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - pod3_network
+
+  fastapi:
+
+    build:
+      context: .
+      dockerfile: docker/fastapi/Dockerfile
+    container_name: pod3_fastapi
+    depends_on:
+      - db
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    networks:
+      - pod3_network
 
 volumes:
   postgres_data:
+
+
+networks:
+  pod3_network:
