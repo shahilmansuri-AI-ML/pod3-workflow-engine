@@ -14,18 +14,20 @@ class Coordinator:
         self.state_manager = StateManager()
         self.step_executor = StepExecutor()
 
-    def execute(self, execution_id):
+    def execute(self, execution_id: str):
 
         session = SessionLocal()
 
         try:
 
+            # ------------------------------------
             # Load execution
+            # ------------------------------------
             execution = session.execute(
                 text("""
                 SELECT *
                 FROM executions
-                WHERE execution_id=:execution_id
+                WHERE execution_id = :execution_id
                 """),
                 {"execution_id": execution_id}
             ).mappings().first()
@@ -33,12 +35,19 @@ class Coordinator:
             if not execution:
                 raise Exception("Execution not found")
 
+            input_payload = execution["input_payload"]
+
+            if isinstance(input_payload, str):
+                input_payload = json.loads(input_payload)
+
+            # ------------------------------------
             # Load agent metadata
+            # ------------------------------------
             agent = session.execute(
                 text("""
                 SELECT *
                 FROM agent_registry
-                WHERE agent_id=:agent_id
+                WHERE agent_id = :agent_id
                 """),
                 {"agent_id": execution["agent_id"]}
             ).mappings().first()
@@ -46,44 +55,95 @@ class Coordinator:
             if not agent:
                 raise Exception("Agent not found")
 
-            # Acquire lock
-            lock_acquired = self.lock_manager.acquire_execution_lock(
+            # ------------------------------------
+            # Acquire execution lock
+            # ------------------------------------
+            self.lock_manager.acquire_execution_lock(
                 session,
                 execution_id,
                 "worker-1"
             )
 
-            if not lock_acquired:
-                raise Exception("Execution already locked")
+            # ------------------------------------
+            # Initialize state
+            # ------------------------------------
+            self.state_manager.initialize_state(
+                session,
+                execution_id
+            )
 
-            # Update status RUNNING
+            # ------------------------------------
+            # Mark execution as RUNNING
+            # ------------------------------------
             session.execute(
                 text("""
                 UPDATE executions
-                SET status='RUNNING',
-                    started_at=NOW()
-                WHERE execution_id=:execution_id
+                SET status = 'RUNNING',
+                    started_at = NOW(),
+                    updated_at = NOW()
+                WHERE execution_id = :execution_id
                 """),
                 {"execution_id": execution_id}
             )
 
-            session.commit()
-
-            # Execute step
-            result = self.step_executor.execute(
+            # ------------------------------------
+            # Write EXECUTION_STARTED event
+            # ------------------------------------
+            self.state_manager.write_event(
                 session,
-                execution,
-                agent
+                execution_id,
+                None,
+                "EXECUTION_STARTED",
+                {
+                    "agent_id": str(agent["agent_id"])
+                }
             )
 
-            # Update execution success
+            session.commit()
+
+            # ------------------------------------
+            # Execute step
+            # ------------------------------------
+            result = self.step_executor.execute(
+                session,
+                execution_id,
+                agent,
+                input_payload
+            )
+
+            # ------------------------------------
+            # Update execution_state
+            # ------------------------------------
+            self.state_manager.update_state(
+                session,
+                execution_id,
+                result,
+                "agent_execution"
+            )
+
+            # ------------------------------------
+            # Write EXECUTION_COMPLETED event
+            # ------------------------------------
+            self.state_manager.write_event(
+                session,
+                execution_id,
+                None,
+                "EXECUTION_COMPLETED",
+                result
+            )
+
+            # ------------------------------------
+            # Mark execution completed
+            # ------------------------------------
             session.execute(
                 text("""
                 UPDATE executions
-                SET status='COMPLETED',
-                    output_payload=:output,
-                    completed_at=NOW()
-                WHERE execution_id=:execution_id
+                SET status = 'COMPLETED',
+                    output_payload = :output,
+                    completed_at = NOW(),
+                    updated_at = NOW(),
+                    current_step_key = 'agent_execution'
+                WHERE execution_id = :execution_id
                 """),
                 {
                     "execution_id": execution_id,
@@ -93,17 +153,41 @@ class Coordinator:
 
             session.commit()
 
+            # ------------------------------------
+            # Release lock
+            # ------------------------------------
+            self.lock_manager.release_execution_lock(
+                session,
+                execution_id
+            )
+
+            session.commit()
+
             return result
 
         except Exception as e:
 
+            session.rollback()
+
+            # Write failure event
+            self.state_manager.write_event(
+                session,
+                execution_id,
+                None,
+                "EXECUTION_FAILED",
+                {
+                    "error": str(e)
+                }
+            )
+
             session.execute(
                 text("""
                 UPDATE executions
-                SET status='FAILED',
-                    error_message=:error,
-                    completed_at=NOW()
-                WHERE execution_id=:execution_id
+                SET status = 'FAILED',
+                    error_message = :error,
+                    completed_at = NOW(),
+                    updated_at = NOW()
+                WHERE execution_id = :execution_id
                 """),
                 {
                     "execution_id": execution_id,
