@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 from app.database import SessionLocal
 from runtime.coordinator import Coordinator
+from services.deployment_service import DeploymentService
 
 import json
 import uuid
@@ -11,20 +12,13 @@ app = FastAPI(title="Pod-3 Workflow Execution Engine")
 
 # Coordinator = Orchestration Engine
 coordinator = Coordinator()
+deployment_service = DeploymentService()
 
 
-# =====================================================
 # API 1: REGISTER AGENT
 # =====================================================
 @app.post("/agents/register")
 def register_agent(data: dict):
-    """
-    Registers a no-code agent in agent_registry table.
-
-    WHY this exists:
-    - Pod-3 does not hardcode agents
-    - Agents are dynamically loaded from database
-    """
 
     session = SessionLocal()
 
@@ -37,7 +31,8 @@ def register_agent(data: dict):
             "tenant_id",
             "agent_name",
             "system_prompt",
-            "model_name"
+            "model_name",
+            "workflow_definition"
         ]
 
         for field in required_fields:
@@ -72,8 +67,13 @@ def register_agent(data: dict):
                 agent_id,
                 tenant_id,
                 agent_name,
+                description,
+                agent_type,
+                agent_mode,
+                execution_framework,
                 system_prompt,
                 model_name,
+                workflow_definition,
                 status,
                 created_at,
                 updated_at
@@ -82,15 +82,28 @@ def register_agent(data: dict):
                 gen_random_uuid(),
                 :tenant_id,
                 :agent_name,
+                :description,
+                'no_code',
+                'single_agent',
+                :execution_framework,
                 :system_prompt,
                 :model_name,
-                'ACTIVE',
+                :workflow_definition,
+                'DRAFT',
                 NOW(),
                 NOW()
             )
             RETURNING agent_id
             """),
-            data
+                        {
+                "tenant_id": data["tenant_id"],
+                "agent_name": data["agent_name"],
+                "description": data.get("description"),
+                "execution_framework": data.get("execution_framework", "ollama"),
+                "system_prompt": data["system_prompt"],
+                "model_name": data["model_name"],
+                "workflow_definition": json.dumps(data["workflow_definition"])
+            }
         )
 
         agent_id = result.scalar()
@@ -120,8 +133,23 @@ def register_agent(data: dict):
         session.close()
 
 
-# =====================================================
-# API 2: EXECUTE AGENT
+# API 2: DEPLOYE AGENT
+# =====================================================     
+@app.post("/deployments/deploy-agent")
+def deploy_agent(payload: dict):
+
+    agent_id = payload["agent_id"]
+    tenant_id = payload["tenant_id"]
+
+    result = deployment_service.deploy_agent(
+        agent_id,
+        tenant_id
+    )
+
+    return result
+
+
+# API 3: EXECUTE AGENT
 # =====================================================
 @app.post("/execute/{agent_id}")
 def execute(agent_id: str, payload: dict):

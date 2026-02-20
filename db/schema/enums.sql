@@ -60,7 +60,7 @@ CREATE TYPE lock_type AS ENUM (
 -- Agent Status Enum
 CREATE TYPE agent_status AS ENUM (
     'DRAFT',
-    'ACTIVE',
+    'DEPLOYED',
     'PAUSED',
     'ARCHIVED'
 );
