@@ -153,14 +153,6 @@ def deploy_agent(payload: dict):
 # =====================================================
 @app.post("/execute/{agent_id}")
 def execute(agent_id: str, payload: dict):
-    """
-    Creates execution and runs orchestration engine.
-
-    WHY this exists:
-    - Creates execution record
-    - Coordinator handles orchestration
-    - Enables resumability and tracking
-    """
 
     session = SessionLocal()
 
@@ -168,35 +160,34 @@ def execute(agent_id: str, payload: dict):
 
         print("Execution request received")
 
-        # --------------------------
         # Validate payload
-        # --------------------------
         if "tenant_id" not in payload:
             raise Exception("tenant_id is required")
 
-        # --------------------------
-        # Validate agent exists
-        # --------------------------
+        tenant_id = payload["tenant_id"]
+
+        # Validate deployed agent
         agent = session.execute(
             text("""
-            SELECT agent_id
+            SELECT agent_id, execution_framework, workflow_definition
             FROM agent_registry
             WHERE agent_id = :agent_id
-            AND status = 'ACTIVE'
+            AND tenant_id = :tenant_id
+            AND status = 'DEPLOYED'
             """),
-            {"agent_id": agent_id}
-        ).fetchone()
+            {
+                "agent_id": agent_id,
+                "tenant_id": tenant_id
+            }
+        ).mappings().first()
 
         if not agent:
-            raise Exception("Agent not found or inactive")
+            raise Exception("Agent not found or not deployed")
 
-        # --------------------------
         # Insert execution
-        # --------------------------
         result = session.execute(
             text("""
             INSERT INTO executions (
-                execution_id,
                 workflow_id,
                 tenant_id,
                 agent_id,
@@ -206,7 +197,6 @@ def execute(agent_id: str, payload: dict):
                 created_at
             )
             VALUES (
-                gen_random_uuid(),
                 :workflow_id,
                 :tenant_id,
                 :agent_id,
@@ -219,7 +209,7 @@ def execute(agent_id: str, payload: dict):
             """),
             {
                 "workflow_id": "single_agent_workflow",
-                "tenant_id": payload["tenant_id"],
+                "tenant_id": tenant_id,
                 "agent_id": agent_id,
                 "input_payload": json.dumps(payload)
             }
@@ -231,9 +221,7 @@ def execute(agent_id: str, payload: dict):
 
         print(f"Execution created: {execution_id}")
 
-        # --------------------------
         # Call orchestration engine
-        # --------------------------
         result = coordinator.execute(str(execution_id))
 
         print(f"Execution completed: {execution_id}")
@@ -257,4 +245,5 @@ def execute(agent_id: str, payload: dict):
         )
 
     finally:
+
         session.close()
